@@ -27,7 +27,7 @@ It's the normal Ship Pilot, titled **Warship**. The menu's **A** tile is **Auto 
 The screen also shows the radar, round speed, ship speed and rock, the nearest targets, and what every cannon is doing (L/R side, ON TARGET, FIRING, own ship in line, and how far it would miss).
 
 - Fire Control runs in the background the whole time, so the cannons work while you're flying.
-- **G on the typewriter arms/safes the cannons from any screen**, including while flying. A speaker (if connected) beeps high for armed and low for safe. Change the key in Keybinds (K), under "Arm/safe guns". Like every typewriter key besides movement, it has to be bound to a Redstone Link frequency on the typewriter (sneak + right-click it).
+- **F on the typewriter arms/safes the cannons from any screen**, including while flying. A speaker (if connected) beeps high for armed and low for safe. Change the key in Keybinds (K), under "Arm/safe guns". Like every typewriter key besides movement, it has to be bound to a Redstone Link frequency on the typewriter (sneak + right-click it).
 - A red **ARMED** badge sits in the title bar on every screen while they're armed, and the Fly screen has a guns line.
 - Only the computer's own keys (and screen/monitor taps) work on the Auto cannons screen. Typewriter keys fly the ship, so turning left with A can't arm the cannons.
 - If Fire Control crashes, the pilot keeps flying. The Auto cannons screen shows the error, and **R** restarts it.
