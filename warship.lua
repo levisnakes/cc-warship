@@ -30,7 +30,7 @@ end
 
 -- ============================================================ setup
 
-VERSION = "1.2.1"
+VERSION = "1.3.0"
 local args = { ... }
 local PILOT_REPO, PILOT_FILE = "levisnakes/cc-ship-pilot", "/ship.lua"
 local GUNS_REPO, GUNS_FILE = "levisnakes/cc-fire-control", "/fire_control.lua"
@@ -426,7 +426,10 @@ function cap.flight(x, y, w, h, ps, sz)
     return
   end
   local bc = ({ HOVER = GREEN, CLIMB = CYAN, DESCEND = ORANGE, PARKED = DIM, LANDED = DIM })[ps.badge] or BLUE
-  cap.pill(ps.badge, x + w - pad, y + pad * 0.6, bc, sz.small)
+  local lock = cap.lockState(ps)
+  local pillText, pillC = ps.badge, bc
+  if lock == "locked" then pillText, pillC = "LOCKED", CYAN elseif lock == "stopping" then pillText, pillC = "STOPPING", YELLOW end
+  cap.pill(pillText, x + w - pad, y + pad * 0.6, pillC, sz.small)
 
   -- Heading tape: 120 degrees across, ticks every 10, labels every 30.
   local ty, th = y + pad * 2 + sz.small, sz.med * 1.9
@@ -493,6 +496,21 @@ function cap.flight(x, y, w, h, ps, sz)
   -- What's flying the ship
   local my = y + h - pad - sz.small
   local mode, mc
+  if lock then
+    -- Stop & hold (B) or the autopilot holding a spot: a bar you can't miss.
+    local title, tc, bgc = "LOCKED IN PLACE", CYAN, { 20, 70, 85 }
+    if lock == "stopping" then title, tc, bgc = "STOPPING TO LOCK", YELLOW, { 75, 65, 20 }
+    elseif lock == "nosetup" then title, tc, bgc = "CAN'T LOCK", ORANGE, { 80, 45, 15 } end
+    cap.rect(x + pad * 0.5, my - pad * 0.3, w - pad, sz.small + pad * 0.6, bgc)
+    cap.text(title, x + pad, my, tc, sz.small, "bold")
+    local st = ps.nav.status or ""
+    local off = st:match("%(([%d.]+) off%)")
+    st = off and ("drift " .. off) or st:gsub("^stopping, ", ""):gsub("run Smart setup %(S%) first", "run Smart setup")
+      :gsub("needs Smart setup first", "run Smart setup")
+    local lw = cap.tw(title, sz.small, "bold") + pad * 2
+    cap.textR(cap.fit(st, w - lw - pad * 2, sz.small), x + w - pad, my, WHITE, sz.small)
+    return
+  end
   if ps.nav then
     mode = ps.nav.mode == "brake" and "STOP & HOLD" or ("AUTOPILOT " .. (ps.nav.x and string.format("> %d %d", ps.nav.x, ps.nav.z) or ""))
     mc = GREEN
@@ -540,6 +558,13 @@ function cap.radar(x, y, w, h, ps, gs, sz)
   cap.line(cx, cy - s * 1.6, cx - s, cy + s, CYAN)
   cap.line(cx, cy - s * 1.6, cx + s, cy + s, CYAN)
   cap.line(cx - s, cy + s, cx + s, cy + s, CYAN)
+  if cap.locked(ps) then
+    local b = s * 2.6
+    cap.line(cx - b, cy - b, cx + b, cy - b, CYAN)
+    cap.line(cx + b, cy - b, cx + b, cy + b, CYAN)
+    cap.line(cx + b, cy + b, cx - b, cy + b, CYAN)
+    cap.line(cx - b, cy + b, cx - b, cy - b, CYAN)
+  end
 
   if not gs then
     cap.textC("guns offline", cx, cy + r * 0.35, DIM, sz.small)
@@ -569,6 +594,18 @@ end
 -- Cannon states, short enough for a two-column tile.
 local SHORT = { ["points at own ship"] = "own ship", ["own ship in line"] = "ship in line", ["not on target"] = "aiming",
   ["no target"] = "idle", ["not assembled"] = "unassembled", ["ship rocking"] = "rocking", ["ON TARGET"] = "ON TARGET" }
+
+-- Stop & hold (B) or the autopilot holding a spot: "locked" only once it
+-- really is holding; "stopping" on the way; "nosetup" when it can't hold.
+function cap.lockState(ps)
+  local n = ps and ps.nav
+  if not n or (n.mode ~= "brake" and n.mode ~= "hold") then return nil end
+  local st = n.status or ""
+  if st:find("Smart setup") then return "nosetup" end
+  if st:find("^holding") or st:find("holding here") then return "locked" end
+  return "stopping"
+end
+function cap.locked(ps) return cap.lockState(ps) == "locked" end
 
 -- The target's direction as a clock position (12 = dead ahead).
 local function clockOf(ps, t)
@@ -656,6 +693,7 @@ function cap.alerts(ps, gs)
     if ps.overstressed > 0 then add(ps.overstressed .. " OVERSTRESSED", RED) end
     if ps.relayError then add("RELAY ERROR", ORANGE) end
     if not ps.typewriter then add("NO TYPEWRITER", ORANGE) end
+    if cap.lockState(ps) == "nosetup" then add("HOLD NEEDS SMART SETUP", ORANGE) end
   end
   if gs then
     if gs.fireControllers > 0 then add("FIRE CONTROLLER ON NETWORK", RED) end
@@ -693,6 +731,9 @@ function cap.draw()
   if #alerts == 0 then
     cap.rect(pad, sy, W - pad * 2, stripH, PANEL)
     cap.text("ALL SYSTEMS NORMAL", pad * 2, sy + (stripH - sz.small) / 2, GREEN, sz.small, "bold")
+    if cap.locked(ps) then
+      cap.text("LOCKED IN PLACE", pad * 4 + cap.tw("ALL SYSTEMS NORMAL", sz.small, "bold"), sy + (stripH - sz.small) / 2, CYAN, sz.small, "bold")
+    end
   else
     -- blinks between bright and dark for red alerts
     local hot = alerts[1][2] == RED and math.floor(os.clock() * 2) % 2 == 0
