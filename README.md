@@ -33,6 +33,17 @@ The screen also shows the radar, round speed, ship speed and rock, the nearest t
 - If Fire Control crashes, the pilot keeps flying. The Auto cannons screen shows the error, and **R** restarts it.
 - Ctrl+T stops both: thrusters off, lift held, triggers released.
 
+## Captain's display
+
+Put a wide Advanced Monitor (3x1 works well) and a **DirectGPU** on the ship's wired network. Warship finds the widest monitor by itself, or you can set `CAPTAIN_MONITOR` at the top of `startup.lua`.
+
+![Captain's display](captain-display.png)
+
+- **Flight:** what the ship is doing (HOVER/CLIMB/PARKED...), a compass heading tape, speed, height, climb rate, throttle, lift, fuel with time left, and who's flying (manual, smart heading hold, autopilot).
+- **Radar:** heading-up (the nose points up), range rings, every target, and the nearest one ringed with its distance.
+- **Weapons:** ARMED/SAFE, the nearest target (distance, clock bearing like "2 o'clock", speed), and every cannon's state (FIRING, ON TARGET, aiming, own ship in line...).
+- **Warning strip:** low fuel, fuel alarm, guns stopped, no radar, Fire Controller on the network, overstressed machines, relay errors, missing typewriter, holding fire while rocking. Red warnings blink. If nothing's wrong it says ALL SYSTEMS NORMAL. The in-game time is on the right.
+
 ## Hardware
 
 Everything both programs need, on the same wired modem network as the computer: Linked Typewriter, thrusters, relay/transmission (pilot), Cannon Mounts and a radar (guns). See each program's README.
