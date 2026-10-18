@@ -30,7 +30,7 @@ end
 
 -- ============================================================ setup
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 local args = { ... }
 local PILOT_REPO, PILOT_FILE = "levisnakes/cc-ship-pilot", "/ship.lua"
 local GUNS_REPO, GUNS_FILE = "levisnakes/cc-fire-control", "/fire_control.lua"
@@ -638,9 +638,10 @@ function cap.weapons(x, y, w, h, ps, gs, sz)
       cap.textR(cap.fit(cols == 1 and st or short, cw - lw - pad * 0.5, fs), mx + cw - pad * 0.5, my + (rh - 3 - fs) / 2, col, fs)
     end
   end
-  local foot = string.format("rounds %.1f b/t %s   rock %.1f deg/s", gs.speed,
-    gs.speedLearned and "(learned)" or "(guess)", gs.rock) .. (gs.ignored > 0 and string.format("   %d ignored", gs.ignored) or "")
-  cap.text(cap.fit(foot, w - pad * 2, sz.tiny), x + pad, footY, gs.rock > gs.maxRock and ORANGE or DIM, sz.tiny)
+  local rocking = gs.rock > gs.maxRock
+  local foot = rocking and "Ship rocking - holding fire" or "Ship steady"
+  if gs.ignored > 0 then foot = foot .. string.format("   (%d ignored)", gs.ignored) end
+  cap.text(cap.fit(foot, w - pad * 2, sz.tiny), x + pad, footY, rocking and ORANGE or DIM, sz.tiny, rocking and "bold" or "plain")
 end
 
 -- Problems, most important first.
