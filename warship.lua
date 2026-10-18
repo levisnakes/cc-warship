@@ -1,10 +1,10 @@
 -- Warship: Ship Pilot and Fire Control on one computer, one screen.
 --
 -- The Ship Pilot runs as usual (fly from the Linked Typewriter). Its menu's
--- A tile is "Auto cannons" here instead of "Go to": arm/safe, fire, ignore,
--- and what every cannon is doing. Fire Control (cc-fire-control) runs out of
+-- A tile is "Auto cannons" here instead of "Go to": what every cannon is
+-- doing. Hold F on the typewriter to fire. Fire Control (cc-fire-control) runs out of
 -- sight the whole time, so the radar-aimed cannons work on every screen.
--- The title bar turns red (ARMED) while the cannons are armed.
+-- The title bar shows FIRING while the fire key is held.
 --
 -- Captain's display: a wide monitor with a DirectGPU on the network shows
 -- flight (heading, speed, height, throttle, lift, fuel, autopilot), a
@@ -30,7 +30,7 @@ end
 
 -- ============================================================ setup
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 local args = { ... }
 local PILOT_REPO, PILOT_FILE = "levisnakes/cc-ship-pilot", "/ship.lua"
 local GUNS_REPO, GUNS_FILE = "levisnakes/cc-fire-control", "/fire_control.lua"
@@ -626,7 +626,7 @@ function cap.weapons(x, y, w, h, ps, gs, sz)
     if err then cap.text(cap.fit(err:match("^[^\n]*"), w - pad * 2, sz.tiny), x + pad, y + pad * 2.5 + sz.small + sz.med, MUTED, sz.tiny) end
     return
   end
-  cap.pill(gs.armed and "ARMED" or "SAFE", x + w - pad, y + pad * 0.6, gs.armed and RED or GREEN, sz.small)
+  cap.pill(gs.firing and "FIRING" or "READY", x + w - pad, y + pad * 0.6, gs.firing and RED or GREEN, sz.small)
 
   -- Nearest target
   local ty = y + pad * 2 + sz.small
@@ -676,7 +676,7 @@ function cap.weapons(x, y, w, h, ps, gs, sz)
     end
   end
   local rocking = gs.rock > gs.maxRock
-  local foot = rocking and "Ship rocking - holding fire" or "Ship steady"
+  local foot = rocking and "Ship rocking - shots may miss" or "Ship steady"
   if gs.ignored > 0 then foot = foot .. string.format("   (%d ignored)", gs.ignored) end
   cap.text(cap.fit(foot, w - pad * 2, sz.tiny), x + pad, footY, rocking and ORANGE or DIM, sz.tiny, rocking and "bold" or "plain")
 end
@@ -698,7 +698,6 @@ function cap.alerts(ps, gs)
   if gs then
     if gs.fireControllers > 0 then add("FIRE CONTROLLER ON NETWORK", RED) end
     if not gs.radar then add("NO RADAR", ORANGE) end
-    if gs.armed and gs.rock > gs.maxRock then add("HOLDING FIRE: SHIP ROCKING", ORANGE) end
     if #gs.mounts == 0 then add("NO CANNONS", ORANGE) end
   end
   return a
