@@ -1,13 +1,10 @@
--- Warship: Ship Pilot and Fire Control on one computer.
+-- Warship: Ship Pilot and Fire Control on one computer, one screen.
 --
--- Both programs run at the same time, each on its own screen:
---   Pilot  flies the ship (cc-ship-pilot, keys on the Linked Typewriter)
---   Guns   fires the radar-aimed cannons (cc-fire-control)
--- Press ` (the key under Esc) on the computer to switch screens.
---
--- Typewriter keys always go to the pilot, never to the guns, so turning
--- left with A can't arm the cannons. Keys typed on the computer go to the
--- screen you're looking at.
+-- The Ship Pilot runs as usual (fly from the Linked Typewriter). Its menu's
+-- A tile is "Auto cannons" here instead of "Go to": arm/safe, fire, ignore,
+-- and what every cannon is doing. Fire Control (cc-fire-control) runs out of
+-- sight the whole time, so the radar-aimed cannons work on every screen.
+-- The title bar turns red (ARMED) while the cannons are armed.
 --
 -- Settings for the two programs stay where they always were:
 --   pilot: ship_settings.lua / its menus (saved in ship.cfg)
@@ -17,8 +14,6 @@
 -- Fire Control's own 15-minute updater still runs, but it only restarts
 -- the guns, never the whole computer, so the ship keeps flying.
 
-SWITCH_KEY = "grave"      -- key on the computer that swaps Pilot / Guns screens
-START_ON = "pilot"        -- screen shown first: "pilot" or "guns"
 AUTO_UPDATE = true
 
 if fs and fs.exists("/config.lua") then
@@ -29,7 +24,7 @@ end
 
 -- ============================================================ setup
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 local args = { ... }
 local PILOT_REPO, PILOT_FILE = "levisnakes/cc-ship-pilot", "/ship.lua"
 local GUNS_REPO, GUNS_FILE = "levisnakes/cc-fire-control", "/fire_control.lua"
@@ -219,21 +214,21 @@ pcall(installGuns)
 
 -- ============================================================ two programs
 
+-- The pilot owns the screen, keyboard and monitor. Fire Control runs out of
+-- sight and hands its status and controls to the pilot's Auto cannons screen
+-- through WARSHIP.guns.
 local native = term.current()
 local W, H = native.getSize()
-local TYPING = { key = true, key_up = true, char = true, paste = true }
-local MOUSE = { mouse_click = true, mouse_up = true, mouse_drag = true, mouse_scroll = true }
+local WARSHIP = { version = VERSION }
 
-local progs = {
-  pilot = { name = "Pilot", path = PILOT_FILE, args = args },
-  guns = { name = "Guns", path = GUNS_FILE, args = {} },
-}
-local order = { progs.pilot, progs.guns }
-local focus = progs[START_ON] or progs.pilot
-local quitting = false
+local pilot = { name = "Pilot", path = PILOT_FILE, args = args, visible = true }
+local gunsP = { name = "Fire Control", path = GUNS_FILE, args = {}, visible = false }
+local order = { pilot, gunsP }
+local quitting, restartGuns = false, false
 
+local resume
 local function start(p)
-  p.win = p.win or window.create(native, 1, 1, W, H, p == focus)
+  p.win = p.win or window.create(native, 1, 1, W, H, p.visible)
   p.win.setBackgroundColor(colors.black)
   p.win.setTextColor(colors.white)
   p.win.clear()
@@ -244,12 +239,21 @@ local function start(p)
   -- it parks the program (a pcall around it can't catch that) and the
   -- loop below starts it again.
   local env = {
+    WARSHIP = WARSHIP,
     shell = setmetatable({ getRunningProgram = function() return p.path:sub(2) end }, { __index = shell }),
     os = setmetatable({ reboot = function()
       p.restart = true
       while true do coroutine.yield() end
     end }, { __index = os }),
   }
+  if p == gunsP then
+    WARSHIP.guns, WARSHIP.gunsError, WARSHIP.gunsNote = nil, nil, nil
+    -- Its messages ("not on a Sable ship") show on the Auto cannons screen.
+    env.printError = function(...)
+      WARSHIP.gunsNote = table.concat({ ... }, " ")
+      printError(...)
+    end
+  end
   p.co = coroutine.create(function()
     if not fs.exists(p.path) then error(p.path:sub(2) .. " isn't installed - check the internet and reboot", 0) end
     local fn, err = loadfile(p.path, nil, setmetatable(env, { __index = _G }))
@@ -258,17 +262,13 @@ local function start(p)
   end)
 end
 
-local function show(p)
-  if focus == p then return end
-  focus.win.setVisible(false)
-  focus = p
-  p.win.setVisible(true)
-  p.win.redraw()
-  p.win.restoreCursor()
-end
-
 local function stopped(p, err)
   p.dead, p.err = true, err
+  if p == gunsP then
+    WARSHIP.guns = nil
+    WARSHIP.gunsError = tostring(err or WARSHIP.gunsNote or "it stopped")
+    return
+  end
   local w = p.win
   w.setBackgroundColor(colors.black)
   w.setCursorPos(1, H - 2)
@@ -278,11 +278,11 @@ local function stopped(p, err)
   w.setCursorPos(1, H - 1)
   w.clearLine()
   w.setTextColor(colors.yellow)
-  w.write("Enter: restart " .. p.name)
+  w.write("Enter: restart " .. p.name .. " (the cannons keep running)")
   w.setTextColor(colors.white)
 end
 
-local function resume(p, ev)
+function resume(p, ev)
   if p.dead then return end
   if p.filter and p.filter ~= ev[1] and ev[1] ~= "terminate" then return end
   term.redirect(p.term)
@@ -301,116 +301,39 @@ local function resume(p, ev)
   end
 end
 
--- Little bar in the bottom-right corner for a few seconds after a switch.
-local toastUntil, toastTimer = 0, nil
-local function toast()
-  toastUntil = os.clock() + 3
-  toastTimer = os.startTimer(3)
-end
-local function drawToast()
-  if os.clock() >= toastUntil then return end
-  local key = (keys.getName(keys[SWITCH_KEY] or 0) or SWITCH_KEY):gsub("^grave$", "`")
-  local text = " " .. focus.name .. " screen - " .. key .. " switches "
-  native.setCursorPos(math.max(1, W - #text + 1), H)
-  native.setBackgroundColor(colors.blue)
-  native.setTextColor(colors.white)
-  native.write(text)
-  focus.win.restoreCursor()
-end
+-- The pilot's R on the Auto cannons screen.
+WARSHIP.restartGuns = function() restartGuns = true end
 
--- Typewriter keys: the computer gets the same key events from the
--- typewriter as from its own keyboard; the typewriter's held keys tell
--- them apart (seen in the last half second, for quick taps).
--- Polled every tick too, so even a quick tap is never taken for the keyboard.
-local typewriter = peripheral.find("linked_typewriter")
-local twSeen = {}
-local pollTimer = nil
-local function pollTypewriter()
-  if not typewriter then return end
-  local ok, codes = pcall(typewriter.getPressedKeyCodes)
-  if ok and type(codes) == "table" then
-    local t = os.clock()
-    for _, c in ipairs(codes) do twSeen[c] = t end
-  end
-end
-local function fromTypewriter(code)
-  pollTypewriter()
-  return twSeen[code] ~= nil and os.clock() - twSeen[code] < 0.5
-end
-
-local keyTo = {}        -- key code -> program that got its key press
-local charTo = nil      -- program for the char event right after a key press
-local eatChar = false   -- the switch key's own char
-
-local function switchScreens()
-  local old = focus
-  -- Keys still held on the computer are let go on the old screen.
-  for code, p in pairs(keyTo) do
-    if p == old then
-      keyTo[code] = nil
-      resume(p, { n = 2, "key_up", code })
-    end
-  end
-  show(old == progs.pilot and progs.guns or progs.pilot)
-  toast()
-end
+local INPUT = { key = true, key_up = true, char = true, paste = true, mouse_click = true, mouse_up = true,
+  mouse_drag = true, mouse_scroll = true, monitor_touch = true }
 
 local function route(ev)
   local name = ev[1]
-  if name == "key" then
-    local code = ev[2]
-    if fromTypewriter(code) then
-      keyTo[code], charTo = progs.pilot, progs.pilot
-      return resume(progs.pilot, ev)
-    end
-    if code == keys[SWITCH_KEY] and not ev[3] then
-      eatChar = true
-      return switchScreens()
-    end
-    if focus.dead then
-      if code == keys.enter then start(focus) resume(focus, { n = 0 }) end
+  if INPUT[name] then
+    if pilot.dead then
+      if name == "key" and ev[2] == keys.enter then start(pilot) resume(pilot, { n = 0 }) end
       return
     end
-    keyTo[code], charTo, eatChar = focus, focus, false
-    return resume(focus, ev)
-  elseif name == "key_up" then
-    local p = keyTo[ev[2]]
-    keyTo[ev[2]] = nil
-    if p then return resume(p, ev) end
-    if ev[2] ~= keys[SWITCH_KEY] then return resume(progs.pilot, ev) end
-  elseif name == "char" then
-    if eatChar then eatChar = false return end
-    return resume(charTo or focus, ev)
-  elseif name == "paste" or MOUSE[name] then
-    return resume(focus, ev)
-  elseif name == "monitor_touch" then
-    -- the monitor shows the pilot's screens
-    return resume(progs.pilot, ev)
-  elseif name == "timer" and ev[2] == pollTimer then
-    pollTypewriter()
-    pollTimer = os.startTimer(0.05)
-  elseif name == "timer" and ev[2] == toastTimer then
-    toastTimer = nil
-    focus.win.redraw()
-    focus.win.restoreCursor()
-  else
-    if name == "terminate" then quitting = true end
-    for _, p in ipairs(order) do resume(p, ev) end
+    return resume(pilot, ev)
   end
+  if name == "terminate" then quitting = true end
+  for _, p in ipairs(order) do resume(p, ev) end
 end
 
 for _, p in ipairs(order) do start(p) end
-focus.win.setVisible(true)
-for _, p in ipairs(order) do resume(p, { n = 0 }) end
-toast()
-drawToast()
-if typewriter then pollTimer = os.startTimer(0.05) end
+-- Guns first, so the pilot's first menu already shows them.
+resume(gunsP, { n = 0 })
+resume(pilot, { n = 0 })
 
 while true do
   local ev = table.pack(os.pullEventRaw())
   route(ev)
-  if quitting and progs.pilot.dead and progs.guns.dead then break end
-  drawToast()
+  if restartGuns then
+    restartGuns = false
+    start(gunsP)
+    resume(gunsP, { n = 0 })
+  end
+  if quitting and pilot.dead and gunsP.dead then break end
 end
 
 term.redirect(native)
