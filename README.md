@@ -42,6 +42,7 @@ Put a wide Advanced Monitor (3x1 works well) and a **DirectGPU** on the ship's w
 - **Flight:** what the ship is doing (HOVER/CLIMB/PARKED...), a compass heading tape, speed, height, climb rate, throttle, lift, fuel with time left, and who's flying (manual, smart heading hold, autopilot).
 - **Radar:** heading-up (the nose points up), range rings, every target, and the nearest one ringed with its distance.
 - **Weapons:** ARMED/SAFE, the nearest target (distance, clock bearing like "2 o'clock", speed), and every cannon's state (FIRING, ON TARGET, aiming, own ship in line...).
+- **Locked in place:** while Stop & hold (B) or the autopilot holds a spot, the Flight badge says **LOCKED**, a cyan **LOCKED IN PLACE** bar shows how far it has drifted, and the radar draws a box around your ship. While it's still braking you see yellow **STOPPING TO LOCK** with the speed left. If it can't hold (no Smart setup yet), you get orange **CAN'T LOCK**.
 - **Warning strip:** low fuel, fuel alarm, guns stopped, no radar, Fire Controller on the network, overstressed machines, relay errors, missing typewriter, holding fire while rocking. Red warnings blink. If nothing's wrong it says ALL SYSTEMS NORMAL. The in-game time is on the right.
 
 ## Hardware
